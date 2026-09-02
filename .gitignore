@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+.coverage
+
+# mkdocs output
+site/
+
+# Creator-only notes: kept locally, not published. A release runbook and a
+# personal translation are of no use to anyone reading the repository.
+/RELEASING.md
+/docs/README.vi.md

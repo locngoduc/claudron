@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/locngoduc/claudron/security/advisories/new
+    about: Report privately, not as a public issue.
+  - name: Designing a schedule
+    url: https://locngoduc.github.io/claudron/schedules/
+    about: Why anchors get swallowed, and where the idle hours should go.

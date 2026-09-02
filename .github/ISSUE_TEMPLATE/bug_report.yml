@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not behave the way it is documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste anything from your conversations. claudron never
+        reads message content, and neither should an issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got instead.
+      placeholder: |
+        $ claudron plan
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `claudron doctor`
+      description: >
+        This reports versions, your schedule, and which `claude` flags your
+        build supports. Redact paths if you would rather not share them.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: How did you install claudron?
+      placeholder: pipx / uv / apt / from source
+    validations:
+      required: true

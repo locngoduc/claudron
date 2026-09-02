@@ -1,0 +1,164 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to re-run the release for"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  verify:
+    name: verify the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: read the version
+        id: version
+        run: |
+          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/claudron/__init__.py)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "package version: $version"
+
+      - name: the tag must match the package version
+        run: |
+          expected="v${{ steps.version.outputs.version }}"
+          if [[ "$TAG" != "$expected" ]]; then
+            echo "::error::tag $TAG does not match __version__ ($expected)."
+            echo "Publishing a mislabelled release is worse than not publishing." >&2
+            exit 1
+          fi
+
+      - name: the changelog must describe this version
+        run: |
+          if ! grep -qE "^## \[?${{ steps.version.outputs.version }}\]?" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for ${{ steps.version.outputs.version }}."
+            exit 1
+          fi
+
+      - run: python -m unittest discover -s tests -v
+
+  build:
+    name: build the artifacts
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: build the sdist and the wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          twine check dist/*
+
+      - name: build the Debian package
+        run: packaging/build-deb.sh --outdir dist
+
+      - name: checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts
+          path: dist/
+          if-no-files-found: error
+
+  github-release:
+    name: publish the GitHub release
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: dist
+
+      - name: extract this version's changelog section
+        run: |
+          awk -v version="${{ needs.verify.outputs.version }}" '
+            $0 ~ "^## \\[?" version "\\]?" { collecting = 1; next }
+            collecting && /^## / { exit }
+            collecting { print }
+          ' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "---"
+            echo
+            echo "Install: \`pipx install claudron\`, or see the"
+            echo "[installation guide](https://locngoduc.github.io/claudron/install/)."
+            echo
+            echo "Verify a download with \`sha256sum --check --ignore-missing SHA256SUMS\`."
+          } >> notes.md
+          cat notes.md
+
+      - name: create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --title "claudron ${{ needs.verify.outputs.version }}" \
+            --notes-file notes.md \
+            --verify-tag
+
+  pypi:
+    name: publish to PyPI
+    needs: [verify, build, github-release]
+    runs-on: ubuntu-latest
+    # Trusted publishing: PyPI verifies this workflow's OIDC identity, so no
+    # long-lived API token exists anywhere to be stolen. Set up in RELEASING.md.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/claudron/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: dist
+
+      - name: keep only what PyPI accepts
+        run: rm -f dist/*.deb dist/SHA256SUMS
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  refresh-pages:
+    name: refresh the site and apt repository
+    needs: pypi
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
+    # Without this the called workflow cannot see APT_GPG_PRIVATE_KEY and the
+    # apt repository would be republished unsigned.
+    secrets: inherit

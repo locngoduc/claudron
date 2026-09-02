@@ -1,0 +1,156 @@
+.TH CLAUDRON 1 "2026-09-02" "claudron" "User Commands"
+.SH NAME
+claudron \- align Claude usage windows with your working day
+.SH SYNOPSIS
+.B claudron
+[\fIGLOBAL OPTIONS\fR]
+.I COMMAND
+[\fICOMMAND OPTIONS\fR]
+.SH DESCRIPTION
+A Claude usage window opens on the first message sent while no window is open,
+and lasts five hours. A message sent while a window is already open changes
+nothing. The times you send that first message therefore decide when your
+limits reset.
+.PP
+.B claudron
+sends that message at times you choose, reads your real usage from Claude
+Code's local transcripts, and tells you when to stay quiet so an accidental
+message does not open a window early and push every later reset out of
+alignment.
+.PP
+Because a day is 24 hours and a window is five, a schedule that repeats daily
+holds at most four anchors covering 20 of 24 hours. At least four hours are
+idle; the only choice is where they land.
+.SH GLOBAL OPTIONS
+.TP
+.BR \-c ", " \-\-config " " \fIFILE\fR
+Use an alternate configuration file.
+.TP
+.BR \-v ", " \-\-verbose
+Enable debug logging.
+.TP
+.B \-\-version
+Print the version and exit.
+.SH COMMANDS
+.TP
+.B init
+Create a configuration file, optionally from a named preset.
+.TP
+.B suggest
+Propose anchor times that fit your day. Describe when you sleep
+.RB ( \-\-sleep ),
+when you are away
+.RB ( \-\-idle ),
+when you really work
+.RB ( \-\-busy ),
+and the times you need
+.RB ( \-\-start\-at ", " \-\-free\-at );
+every legal arrangement is searched and ranked by where the unavoidable idle
+hours land.
+.B \-\-apply
+writes the chosen option into the configuration file.
+.TP
+.B status
+The window that is open now, the tokens spent in it, whether it matches your
+plan, and the next anchor.
+.B \-\-short
+prints one line, suitable for a status bar.
+.TP
+.B plan
+Simulate a day: a 24\-hour timeline, the anchors, the idle gaps, and any anchor
+that would open nothing.
+.B \-\-live
+seeds the simulation with the window that is actually open.
+.TP
+.B usage
+Real token usage per window, read from local transcripts.
+.TP
+.B fire
+Send an anchor message now.
+.B \-\-dry\-run
+prints the exact command without sending anything.
+.B \-\-scheduled
+fires only when an anchor is due, and is what the timer unit runs.
+.TP
+.B daemon
+Run the supervisor in the foreground: fire anchors, catch up after suspend, and
+warn when a window opens inside an idle gap.
+.TP
+.B install
+Install a systemd user timer, a systemd service, a launchd agent, or print cron
+lines.
+.TP
+.B uninstall
+Remove the installed schedule.
+.TP
+.B doctor
+Check the environment and the schedule.
+.TP
+.B completion
+Print a shell completion script for bash, zsh or fish.
+.TP
+.B config
+Inspect configuration:
+.BR path ", " show ", or " presets .
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+The schedule contains an error, or no schedule satisfies the given constraints.
+.TP
+.B 2
+The configuration is missing or invalid.
+.TP
+.B 3
+Something in the environment is missing, such as the \fBclaude\fR CLI.
+.TP
+.B 4
+Firing an anchor failed.
+.SH FILES
+.TP
+.I ~/.config/claudron/config.toml
+Configuration. Override the directory with \fBCLAUDRON_CONFIG_DIR\fR.
+.TP
+.I ~/.local/state/claudron/
+State, the transcript cache, and the log. Override with \fBCLAUDRON_STATE_DIR\fR.
+.TP
+.I ~/.claude/projects/
+Claude Code's transcripts, read for usage. Only the timestamp, message type,
+model id and token counts are parsed; message content is never read.
+.SH ENVIRONMENT
+.TP
+.B CLAUDRON_CONFIG_DIR
+Override the configuration directory.
+.TP
+.B CLAUDRON_STATE_DIR
+Override the state directory.
+.TP
+.B NO_COLOR
+Disable colour output.
+.TP
+.B COLORTERM
+When set to \fBtruecolor\fR or \fB24bit\fR, banners use the pixel logo.
+.SH NOTES
+claudron cannot tell you how much of your rate limit is left. Anthropic does
+not publish that figure to the local machine, so claudron reports token counts
+and compares them against your own busiest window instead of guessing.
+.SH EXAMPLES
+.PP
+Work out a schedule, apply it, and run it unattended:
+.PP
+.RS 4
+.EX
+claudron suggest \-\-start\-at 12:00 \-\-sleep 23:00\-05:00 \-\-apply 1
+claudron plan
+claudron doctor
+claudron install
+.EE
+.RE
+.SH SEE ALSO
+Project homepage and full documentation:
+.UR https://locngoduc.github.io/claudron/
+.UE
+.SH LICENSE
+MIT.

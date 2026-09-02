@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e .
+      - run: python -m unittest discover -s tests -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  artwork:
+    # The logo assets and src/claudron/artwork.py are generated. Regenerate
+    # them and fail if anything moved, so nobody hand-edits the output.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow
+      - run: python tools/make_logo.py
+      - name: assets must match tools/make_logo.py
+        run: git diff --exit-code -- assets docs/assets src/claudron/artwork.py
+
+  package:
+    # Everything a release builds, built on every pull request, so a packaging
+    # break is found before the tag rather than after it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: sdist and wheel
+        run: |
+          pip install --upgrade build twine
+          python -m build
+          twine check dist/*
+
+      - name: the wheel installs on its own and runs
+        run: |
+          python -m venv /tmp/probe
+          /tmp/probe/bin/pip install --quiet dist/*.whl
+          /tmp/probe/bin/claudron --version
+          test "$(/tmp/probe/bin/pip list --format=freeze | wc -l)" -eq 1
+
+      - name: Debian package
+        run: |
+          packaging/build-deb.sh --outdir dist
+          dpkg-deb -I dist/*.deb
+          dpkg-deb -c dist/*.deb
+
+      - name: the installed package runs
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          claudron --version
+          man --warnings -E UTF-8 -l /usr/share/man/man1/claudron.1.gz > /dev/null
+          bash -c 'source /usr/share/bash-completion/completions/claudron
+                   COMP_WORDS=(claudron do); COMP_CWORD=1; _claudron
+                   test "${COMPREPLY[*]}" = doctor'
+          sudo apt-get remove -y claudron
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mkdocs-material
+      # --strict turns a broken cross-reference into a failure rather than a
+      # dead link discovered by a reader.
+      - run: mkdocs build --strict

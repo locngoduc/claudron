@@ -1,0 +1,64 @@
+site_name: claudron
+site_description: Align your Claude usage windows with your working day.
+site_url: https://locngoduc.github.io/claudron/
+repo_url: https://github.com/locngoduc/claudron
+repo_name: locngoduc/claudron
+edit_uri: edit/main/docs/
+copyright: MIT licensed
+
+docs_dir: docs
+
+theme:
+  name: material
+  logo: https://raw.githubusercontent.com/locngoduc/claudron/main/assets/icon.png
+  favicon: https://raw.githubusercontent.com/locngoduc/claudron/main/assets/icon.png
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Install: install.md
+  - Designing a schedule: schedules.md
+  - Project:
+      - Changelog: changelog.md
+      - Contributing: contributing.md
+      - Security: security.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      # Root-level documents are included rather than duplicated, so the
+      # website and the repository can never disagree about their contents.
+      base_path: ["."]
+      check_paths: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/locngoduc/claudron

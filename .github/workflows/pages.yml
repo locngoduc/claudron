@@ -1,0 +1,134 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "RELEASING.md"
+      - "SECURITY.md"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# One deployment at a time, and never cancel one halfway: an interrupted
+# deploy can leave the apt repository without its Release file.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # The `secrets` context cannot be used in `if:`, so decide here once.
+      HAS_APT_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: build the documentation
+        run: |
+          python -m pip install --upgrade mkdocs-material
+          mkdocs build --strict
+          touch site/.nojekyll
+
+      - name: collect every published .deb
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p site/apt
+          tags="$(gh release list --limit 100 --json tagName --jq '.[].tagName' || true)"
+          if [[ -z "$tags" ]]; then
+            echo "no releases yet - publishing the site without an apt repository"
+            exit 0
+          fi
+          for tag in $tags; do
+            gh release download "$tag" --dir site/apt --pattern '*.deb' --clobber || true
+          done
+          ls -la site/apt
+
+      - name: build the apt repository
+        run: |
+          shopt -s nullglob
+          packages=(site/apt/*.deb)
+          if (( ${#packages[@]} == 0 )); then
+            printf '%s\n' \
+              '<!doctype html><meta charset=utf-8><title>claudron apt repository</title>' \
+              '<p>No release has been published yet. See ' \
+              '<a href="../install/">the installation guide</a>.</p>' \
+              > site/apt/index.html
+            echo "nothing to index"
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apt-utils
+          cd site/apt
+          apt-ftparchive packages . > Packages
+          gzip -9nc Packages > Packages.gz
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin=claudron \
+            -o APT::FTPArchive::Release::Label=claudron \
+            -o APT::FTPArchive::Release::Suite=stable \
+            -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Architectures=all \
+            -o APT::FTPArchive::Release::Components=main \
+            release . > Release
+          cat Release
+
+      - name: sign the apt repository
+        # Unsigned repositories are refused by modern apt, so this is what makes
+        # `apt install claudron` work. It is skipped when no key is configured,
+        # which keeps the docs deployable before the key exists.
+        if: env.HAS_APT_KEY == 'true'
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          [[ -f site/apt/Release ]] || { echo "nothing to sign"; exit 0; }
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --quiet --import
+          key="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
+          cd site/apt
+          gpg --batch --yes --pinentry-mode loopback \
+              ${APT_GPG_PASSPHRASE:+--passphrase "$APT_GPG_PASSPHRASE"} \
+              --local-user "$key" --clearsign -o InRelease Release
+          gpg --batch --yes --pinentry-mode loopback \
+              ${APT_GPG_PASSPHRASE:+--passphrase "$APT_GPG_PASSPHRASE"} \
+              --local-user "$key" -abs -o Release.gpg Release
+          # Binary, dearmored - this is the form `signed-by=` expects.
+          gpg --export "$key" > claudron.gpg
+          rm -rf "$GNUPGHOME"
+          ls -la
+
+      - name: warn when the repository is unsigned
+        if: env.HAS_APT_KEY != 'true'
+        run: |
+          echo "::warning::APT_GPG_PRIVATE_KEY is not set, so the apt repository is unsigned and apt will refuse it. See RELEASING.md."
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
