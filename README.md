@@ -324,7 +324,6 @@ and no network.
 
 ## Documentation
 
-- [Vietnamese README](https://locngoduc.github.io/claudron/README.vi/)
 - [Designing a schedule](https://locngoduc.github.io/claudron/schedules/) — the arithmetic, worked examples,
   and how to recover when the day drifts.
 
