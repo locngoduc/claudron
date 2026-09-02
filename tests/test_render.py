@@ -126,10 +126,38 @@ class HourBar(unittest.TestCase):
         covered = set(range(5, 10))
         bar = render.hour_bar(covered, {5}, style)
         lines = bar.splitlines()
-        self.assertEqual(len(lines), 3)
-        strip = lines[1].strip()
+        self.assertEqual(len(lines), 4)
+        strip = lines[2].strip()
         self.assertEqual(strip.count(style.full), len(covered) * render.CELLS_PER_HOUR)
-        self.assertEqual(lines[2].strip(), style.anchor)
+        self.assertEqual(lines[3].strip(), style.anchor)
+
+    def test_every_row_sits_on_the_same_hour_grid(self):
+        # The complaint this guards against is "the arrows do not line up with
+        # the numbers". They do, but only if every row indexes hours the same
+        # way, so pin it: an anchor at hour H, the tick for H and the label for
+        # H all start at column 2 * H.
+        style = render.Style(color=False, unicode_=True)
+        anchors = {2, 7, 12, 17}
+        lines = render.hour_bar(set(range(2, 22)), anchors, style, indent="").splitlines()
+        labels, ticks, bar, markers = lines
+        for hour in range(0, 24, 3):
+            column = hour * render.CELLS_PER_HOUR
+            self.assertEqual(ticks[column], "|")
+            self.assertEqual(labels[column : column + 2], f"{hour:02d}")
+        self.assertEqual(
+            {i for i, char in enumerate(markers) if char == style.anchor},
+            {hour * render.CELLS_PER_HOUR for hour in anchors},
+        )
+        self.assertEqual(len(bar), render.DAY_CELLS)
+
+    def test_the_timeline_and_the_solver_bar_share_one_ruler(self):
+        # plan and suggest draw the same day; a reader who learns to read one
+        # should not have to relearn the other.
+        style = render.Style(color=False, unicode_=True)
+        self.assertEqual(
+            render.hour_bar(set(), set(), style, indent="").splitlines()[:2],
+            [render.hour_labels(style).rstrip(), render.hour_ticks(style).rstrip()],
+        )
 
 
 class Formatting(unittest.TestCase):

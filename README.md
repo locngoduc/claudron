@@ -11,29 +11,89 @@
   </p>
 </div>
 
-Claude's usage limits reset on a rolling window: the window opens when you send
-your **first message** after the previous one expired, and lasts 5 hours. Nobody
-starts it for you. If you stop working at 22:00 and come back at 09:00, your
-window does not open at 03:00 — it opens at 09:00, and your next reset lands at
-14:00, in the middle of the afternoon.
+**claudron moves your Claude usage limits so they reset when you are not working.**
 
-claudron puts the window boundaries where *you* want them. It sends one tiny
-message at the times you choose, reads your **real** usage from Claude Code's
-local transcripts, and tells you when to stay quiet so an accidental message
-does not open a window early and drag the rest of the day out of alignment.
+Claude Code gives you a 5-hour budget at a time. claudron decides *when* those
+5 hours start, so the refill lands on your lunch break instead of in the middle
+of an afternoon.
 
 ```
-── Tuesday 02 September 2026 ────────────────────────────────────
   00    03    06    09    12    15    18    21
   |     |     |     |     |     |     |     |
-  ████████░░░░██████████░░░░████████████████████████████░░░░░░████
-        ▲                  ▲         ▲       ▲
-                                │ now
+  ██████····██████████····████████████████████████
+            ▲             ▲         ▲         ▲
+                               │ now
 
   █ window open   · idle   ▲ anchor   x anchor that opens nothing
 ```
 
----
+## Why you would want this
+
+Your limit runs on a **rolling 5-hour window**. The window opens when you send
+your first message after the last one expired. Nobody starts it for you.
+
+So if you stop at 22:00 and come back at 09:00 the next morning, your window
+does not open at 03:00 while you sleep. It opens at **09:00**, and your next
+refill lands at **14:00** — right in the middle of the afternoon. You hit the
+limit at 13:00 with an hour of work left and nothing to do but wait.
+
+claudron fixes that by sending one tiny message at the times *you* pick (an
+**anchor**), so the window opens at 05:00 while you are asleep and refills at
+10:00, when you are ready for it.
+
+Four two-token messages a day on a small model, with a hard `$0.05` cap on
+each. It never touches your credentials — it just runs the `claude` CLI you
+have already signed into.
+
+## A worked example: keep the refill over lunch
+
+Say your day looks like this:
+
+- you work roughly 09:00 to 18:00
+- lunch is 12:00 to 13:30, and you are away from the keyboard
+- you sleep 23:00 to 07:00
+
+You want the morning's budget to run out *over lunch*, so you sit down at 13:30
+with a full 5 hours ahead of you. Describe that day to claudron and let it do
+the arithmetic:
+
+```bash
+claudron suggest --busy 09:00-18:00 --idle 12:00-14:00 --free-at 14:00 --sleep 23:00-07:00
+```
+
+```
+  1  00:00  07:00  14:00  19:00  ← best fit
+     00    03    06    09    12    15    18    21
+     |     |     |     |     |     |     |     |
+     ██████████····██████████····████████████████████
+     ▲             ▲             ▲         ▲
+     stay quiet  05:00-07:00, 12:00-14:00   4h idle, 2h of it inside your working hours
+     • 14:00 opens a fresh 5h window, running to 19:00
+     • you start the day at 07:00 on a window that opens right then
+```
+
+Read that as: a window opens at **07:00** when you wake and runs to 12:00, which
+is exactly when you leave for lunch. You send nothing until 14:00. Your first
+message that afternoon opens a fresh window running to 19:00.
+
+Two things this output is being honest about:
+
+- **`stay quiet 12:00-14:00`.** The plan only works if you actually send nothing
+  over lunch. One message at 12:30 opens a window that runs to 17:30 and the
+  afternoon anchor does nothing.
+- **`2h of it inside your working hours`.** A day is 24 hours and a window is 5,
+  so `24 / 5 = 4.8` — four windows cover 20 hours and 4 hours are idle no matter
+  what you do. Here 2 of those 4 land on your lunch. That is the cost, stated up
+  front rather than hidden.
+
+Happy with it? Write it to your config and install the timer:
+
+```bash
+claudron suggest --busy 09:00-18:00 --idle 12:00-14:00 --free-at 14:00 --sleep 23:00-07:00 --apply 1
+claudron install
+```
+
+That is the whole workflow. Everything below is detail.
 
 ## The one rule
 
@@ -42,22 +102,22 @@ does not open a window early and drag the rest of the day out of alignment.
 
 Two consequences that trip everybody up:
 
-1. **Your anchor times are not your reset times.** If you want limits to free up
-   at 10:00, the anchor is at **05:00** — 10:00 is when that window *closes*.
-2. **Silence is part of the schedule.** To open a window at 12:00 you must send
-   nothing between 10:00 and 12:00. One stray message at 10:30 opens a window
-   that runs to 15:30, and every anchor before then does nothing.
+1. **Your anchor times are not your refill times.** If you want limits to free
+   up at 12:00, the anchor goes at **07:00** — 12:00 is when that window
+   *closes*.
+2. **Silence is part of the schedule.** To open a window at 14:00 you must send
+   nothing between 12:00 and 14:00. One stray message at 12:30 opens a window
+   that runs to 17:30, and every anchor before then does nothing.
 
-claudron models both halves. `claudron plan` shows the windows *and* the idle
+claudron models both halves. `claudron plan` shows the windows *and* the quiet
 gaps; the daemon warns you when you type into one.
 
-### Why 4 anchors is the maximum
-
-A day is 24 hours and a window is 5. `24 / 5 = 4.8`, so a schedule that repeats
-every day holds **at most 4 anchors covering 20 of 24 hours**, leaving at least
-4 hours idle. There is no arrangement that beats it. `claudron doctor` tells you
-if your anchor list is over budget, and `claudron plan` shows exactly which
-anchors would be swallowed.
+And a third, which is just division: a day is 24 hours and a window is 5, so
+**4 anchors is the maximum**. Four windows cover 20 hours; the remaining 4 are
+idle in every possible schedule. A fifth anchor always lands inside a window
+that is already open and does nothing. `claudron doctor` tells you when your
+anchor list is over budget, and `claudron plan` shows which anchors get
+swallowed.
 
 ---
 
@@ -87,38 +147,24 @@ are in the [installation guide](https://locngoduc.github.io/claudron/install/).
 ## Quick start
 
 ```bash
-claudron suggest --start-at 12:00 --sleep 23:00-05:00 --timezone Asia/Ho_Chi_Minh
-claudron init --preset balanced --timezone Asia/Ho_Chi_Minh
-claudron plan
-claudron doctor
-claudron install
+claudron suggest --sleep 23:00-07:00 --busy 09:00-18:00   # propose anchors
+claudron suggest ... --apply 1                            # write the one you pick
+claudron plan                                             # see the day it produces
+claudron doctor                                           # check the setup
+claudron install                                          # run it every day
 ```
 
-`suggest` proposes anchors that fit your day, `init` writes a fully commented
-config, `plan` simulates the day it produces,
-`doctor` checks your environment, `install` sets up a systemd user timer
-(or a launchd agent on macOS, or prints cron lines).
+`init` is there if you would rather skip the solver:
+`claudron init --preset balanced --timezone Asia/Ho_Chi_Minh` writes a fully
+commented config from a named schedule.
 
-### Or let it work the anchors out for you
+`install` sets up a systemd user timer, a launchd agent on macOS, or prints
+cron lines.
 
-You know your day; you should not have to do the arithmetic. Tell `suggest`
-what is true about your day and it searches every legal schedule for the one
-that puts the unavoidable idle hours where they cost you least.
+## Describing your day to `suggest`
 
-```bash
-claudron suggest --start-at 12:00 --sleep 23:00-05:00 --busy 08:00-18:00
-```
-
-```
-  1  02:00  07:00  12:00  17:00  ← best fit
-     00    03    06    09    12    15    18    21
-     ····████████████████████████████████████████····
-         ▲         ▲         ▲         ▲
-     stay quiet  22:00-02:00   4h idle, 0h of it inside your working hours
-     • 12:00 opens a fresh 5h window, running to 17:00
-     • at 05:00 you pick up the window opened at 02:00 while you slept -
-       2h left on it, none of its budget spent, resetting at 07:00
-```
+You know your day; you should not have to do the arithmetic. `suggest` searches
+every legal schedule and ranks them by where the unavoidable idle hours land.
 
 | flag           | meaning                                                              |
 | -------------- | -------------------------------------------------------------------- |
@@ -185,6 +231,72 @@ answers for a common shape of day.
 | `claudron config`   | `path`, `show`, `presets`                                          |
 
 `status`, `plan` and `usage` all accept `--json` for scripting.
+
+### What they look like
+
+`claudron status` — where you are right now:
+
+```
+── now ─────────────────────────────────────────────────────────
+  window      12:00 → 17:00   2h13m left
+  alignment   on plan
+  used        23.56M tokens over 231 messages (20% of your busiest)
+              fresh 493.8k • cache read 23.07M
+
+── next ────────────────────────────────────────────────────────
+  anchor      17:00 in 2h13m   → window until 22:00
+```
+
+`claudron plan` — the whole day, including the quiet gaps:
+
+```
+── Wednesday 02 September 2026 ─────────────────────────────────
+
+  00    03    06    09    12    15    18    21
+  |     |     |     |     |     |     |     |
+  ██████····██████████····████████████████████████
+            ▲             ▲         ▲         ▲
+                               │ now
+
+── anchors ─────────────────────────────────────────────────────
+time   effect  window
+05:00  opens   05:00 → 10:00
+12:00  opens   12:00 → 17:00
+17:00  opens   17:00 → 22:00
+22:00  opens   22:00 → 03:00
+
+── stay quiet ──────────────────────────────────────────────────
+  03:00 → 05:00   2h
+  10:00 → 12:00   2h
+  Anything you send in these gaps opens a window early and shifts every
+  later reset. Total idle today: 4h.
+```
+
+`claudron usage` — what you really spent, per window:
+
+```
+── usage windows, last 30 days ─────────────────────────────────
+window start      ends   msgs  fresh   cached   total
+Mon 31 Aug 05:00  10:00  240   374.4k  16.84M   17.22M
+Mon 31 Aug 12:00  17:00  383   449.8k  13.86M   14.31M
+Tue 01 Sep 05:00  10:00  278   406.2k  25.60M   26.01M
+Tue 01 Sep 12:00  17:00  482   1.32M   114.15M  115.47M
+Wed 02 Sep 12:00  17:00  231   493.8k  23.07M   23.56M   ← open
+```
+
+`claudron doctor` — is any of this actually going to work:
+
+```
+  [note] claudron 0.1.2
+         python 3.13.1 on Linux
+  [ok] config ~/.config/claudron/config.toml
+         timezone Asia/Ho_Chi_Minh
+  [ok] schedule
+         4 anchors, 20h/24h covered
+  [ok] claude CLI 2.1.258 (Claude Code)
+  [warn] scheduler (systemd)
+         not installed - run `claudron install`
+```
 
 ### Status bar
 

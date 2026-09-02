@@ -43,12 +43,6 @@ dependencies to conflict with, but on Debian and Ubuntu you will need
 
 ### From the apt repository
 
-!!! warning "Available from the first tagged release onwards"
-    The repository is published by CI from the `.deb` attached to each release.
-    Until `v0.1.0` is tagged and the signing key is configured
-    ([RELEASING.md](https://github.com/locngoduc/claudron/blob/main/RELEASING.md)),
-    these URLs return 404 — use `pipx` in the meantime.
-
 ```bash
 sudo install -d -m 0755 /etc/apt/keyrings
 curl -fsSL https://locngoduc.github.io/claudron/apt/claudron.gpg \
@@ -67,11 +61,12 @@ sudo apt install claudron
 
 ### From a downloaded .deb
 
-Every release attaches one. Download it, check it against the published
-checksums, and install:
+Every release attaches one. The snippet below asks PyPI for the current
+version rather than hardcoding one, so it never installs a stale build:
 
 ```bash
-VERSION=0.1.0
+VERSION=$(curl -fsSL https://pypi.org/pypi/claudron/json \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])')
 BASE=https://github.com/locngoduc/claudron/releases/download/v$VERSION
 curl -fLO $BASE/claudron_${VERSION}-1_all.deb
 curl -fLO $BASE/SHA256SUMS

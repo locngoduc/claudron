@@ -153,6 +153,32 @@ def rule(title: str, style: Style, width: int = 64) -> str:
 CELLS_PER_HOUR = 2
 DAY_CELLS = 24 * CELLS_PER_HOUR
 
+#: An hour label is exactly as wide as an hour, so "12" spans the two cells the
+#: 12:00 hour occupies and starts on that hour's tick. Every row below shares
+#: this grid: a marker at column ``2 * hour`` sits on the tick for that hour.
+_LABEL_EVERY = 3
+
+
+def hour_labels(style: Style) -> str:
+    """The ``00    03    06 ...`` row."""
+    cells = [" "] * DAY_CELLS
+    for hour in range(0, 24, _LABEL_EVERY):
+        for offset, char in enumerate(f"{hour:02d}"):
+            cells[hour * CELLS_PER_HOUR + offset] = char
+    return style("".join(cells), "grey")
+
+
+def hour_ticks(style: Style) -> str:
+    """The ``|     |     | ...`` row that ties the bar back to the labels.
+
+    Without it a marker floating between two labels has to be counted out by
+    eye, which is exactly the reading error the ruler exists to prevent.
+    """
+    cells = [" "] * DAY_CELLS
+    for hour in range(0, 24, _LABEL_EVERY):
+        cells[hour * CELLS_PER_HOUR] = "|"
+    return style("".join(cells), "grey")
+
 
 def _cell(moment: datetime, day_start: datetime) -> int:
     offset = (moment - day_start).total_seconds() / 3600.0
@@ -190,22 +216,10 @@ def timeline(sim: Simulation, day: date, tz: tzinfo, style: Style, now: datetime
         index = _cell(now, day_start)
         now_line = " " * index + style(style.now + " now", "magenta", "bold")
 
-    ruler_ticks = [
-        ("|" if (h % 3 == 0 and c == 0) else " ") for h in range(24) for c in range(CELLS_PER_HOUR)
-    ]
-    ruler = "".join(ruler_ticks)
-    labels = [" "] * DAY_CELLS
-    for hour in range(0, 24, 3):
-        text = f"{hour:02d}"
-        start = hour * CELLS_PER_HOUR
-        for offset, char in enumerate(text):
-            if start + offset < DAY_CELLS:
-                labels[start + offset] = char
-
     pad = "  "
     lines = [
-        pad + style("".join(labels), "grey"),
-        pad + style(ruler, "grey"),
+        pad + hour_labels(style),
+        pad + hour_ticks(style),
         pad + bar,
         pad + marker_line,
     ]
@@ -399,11 +413,12 @@ def hour_bar(covered: set[int], anchors: set[int], style: Style, *, indent: str 
         markers[hour * CELLS_PER_HOUR] = style.anchor
     marker_line = style("".join(markers), "cyan")
 
-    labels = [" "] * DAY_CELLS
-    for hour in range(0, 24, 3):
-        for offset, char in enumerate(f"{hour:02d}"):
-            labels[hour * CELLS_PER_HOUR + offset] = char
     return "\n".join(
         line.rstrip()
-        for line in (indent + style("".join(labels), "grey"), indent + bar, indent + marker_line)
+        for line in (
+            indent + hour_labels(style),
+            indent + hour_ticks(style),
+            indent + bar,
+            indent + marker_line,
+        )
     )

@@ -13,7 +13,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from claudron import __version__, cli, completion
+from claudron import __version__, cli, completion, render
 
 ROOT = Path(__file__).resolve().parent.parent
 MAN_PAGE = ROOT / "packaging" / "claudron.1"
@@ -230,3 +230,56 @@ class DebPackage(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DocumentationDiagrams(unittest.TestCase):
+    """Every hour-grid diagram in the docs must sit on the grid the code draws.
+
+    These blocks used to be drawn by hand, and they drifted: anchors landed on
+    half-hours, idle cells used a glyph the tool never emits, and one bar was
+    64 cells wide for a 24-hour day. A reader who counts columns to work out
+    what an anchor means deserves a diagram that survives being counted.
+    """
+
+    LABEL = "00    03    06    09    12    15    18    21"
+
+    def blocks(self):
+        """Each label row in the tracked docs, with the three rows under it."""
+        tracked = subprocess.run(
+            ["git", "ls-files", "README.md", "docs/*.md"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+        for name in tracked:
+            lines = (ROOT / name).read_text(encoding="utf-8").splitlines()
+            for number, line in enumerate(lines, start=1):
+                if self.LABEL in line:
+                    indent = len(line) - len(line.lstrip())
+                    yield f"{name}:{number}", indent, lines[number - 1 : number + 3]
+
+    def test_at_least_one_diagram_is_checked(self):
+        self.assertTrue(list(self.blocks()), "the alignment check found nothing to check")
+
+    def test_diagrams_are_drawn_on_the_hour_grid(self):
+        style = render.Style(color=False, unicode_=True, truecolor=False)
+        for where, indent, (_, ticks, bar, markers) in self.blocks():
+            with self.subTest(diagram=where):
+                self.assertEqual(
+                    [column - indent for column, char in enumerate(ticks) if char == "|"],
+                    list(range(0, render.DAY_CELLS, 3 * render.CELLS_PER_HOUR)),
+                    "tick row does not match the ruler the code draws",
+                )
+                cells = bar[indent:]
+                self.assertEqual(len(cells), render.DAY_CELLS)
+                self.assertLessEqual(set(cells), {style.full, style.empty})
+                for column, char in enumerate(markers):
+                    if char in (style.anchor, "x"):
+                        offset = column - indent
+                        self.assertEqual(
+                            offset % render.CELLS_PER_HOUR,
+                            0,
+                            f"anchor at column {offset} is not on an hour boundary",
+                        )
+                        self.assertLess(offset, render.DAY_CELLS)

@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-09-02
+
+### Fixed
+- The `suggest` timeline was missing the hour tick row that `plan` draws, so
+  the anchor markers floated between the hour labels with nothing to read them
+  against. Both commands now draw the same ruler, and a test pins every row to
+  the same hour grid.
+- The timelines in `README.md` and the schedule guide were drawn by hand and
+  had drifted from what the tool prints: anchors sat on half-hours, idle cells
+  used a glyph claudron never emits, and one bar was 64 cells wide for a
+  24-hour day. They are now real output, and `tests/test_packaging.py` fails
+  the build if a diagram leaves the grid again.
+- The `.deb` download instructions pinned `VERSION=0.1.0`, which quietly sent
+  readers to an old release. They now read the current version from PyPI. The
+  stale "available from the first tagged release onwards" warning above the
+  apt instructions is gone too.
+
+### Changed
+- `README.md` leads with what claudron does and a worked example — a day with
+  a 12:00-13:30 lunch, and the exact command that puts the refill in it —
+  before any of the arithmetic. The command reference now shows what `status`,
+  `plan`, `usage` and `doctor` actually print.
+
 ## [0.1.1] - 2026-09-02
 
 ### Fixed
