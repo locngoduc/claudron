@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-09-02
+
+### Fixed
+- The logo in `README.md` used a path relative to the repository, which
+  GitHub and the documentation site resolve but the PyPI project page
+  cannot. It now points at an absolute URL, so the logo renders on PyPI too.
+- Removed a dead link to a Vietnamese README that was never published (the
+  file is gitignored, kept local-only).
+
 ## [0.1.0] - 2026-09-02
 
 First release.
