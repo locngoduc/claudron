@@ -3,8 +3,8 @@
   <h1>claudron</h1>
   <p><strong>Align your Claude usage windows with your working day.</strong></p>
   <p>
-    <a href="https://pypi.org/project/claudron/"><img alt="PyPI" src="https://img.shields.io/pypi/v/claudron?color=fe7342&label=pypi"></a>
-    <a href="https://pypi.org/project/claudron/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/claudron?color=1b468e"></a>
+    <a href="https://pypi.org/project/claudron/"><img alt="PyPI" src="https://img.shields.io/pypi/v/claudron?cacheSeconds=300&color=fe7342&label=pypi"></a>
+    <a href="https://pypi.org/project/claudron/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/claudron?cacheSeconds=300&color=1b468e"></a>
     <a href="https://github.com/locngoduc/claudron/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/locngoduc/claudron/actions/workflows/ci.yml/badge.svg"></a>
     <a href="https://locngoduc.github.io/claudron/"><img alt="Docs" src="https://img.shields.io/badge/docs-locngoduc.github.io-1b468e"></a>
     <a href="https://github.com/locngoduc/claudron/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-black"></a>
