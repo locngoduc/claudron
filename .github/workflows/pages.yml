@@ -116,7 +116,7 @@ jobs:
         run: |
           echo "::warning::APT_GPG_PRIVATE_KEY is not set, so the apt repository is unsigned and apt will refuse it. See RELEASING.md."
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
