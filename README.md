@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="claudron" width="128">
+  <img src="https://raw.githubusercontent.com/locngoduc/claudron/main/assets/logo.png" alt="claudron" width="128">
   <h1>claudron</h1>
   <p><strong>Align your Claude usage windows with your working day.</strong></p>
   <p>
