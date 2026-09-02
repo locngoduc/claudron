@@ -31,7 +31,7 @@ jobs:
       # The `secrets` context cannot be used in `if:`, so decide here once.
       HAS_APT_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
