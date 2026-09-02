@@ -216,6 +216,11 @@ would open the window in the wrong hour and push every later reset out of place
 for the rest of the day. That is also why the generated systemd timer sets
 `Persistent=false`.
 
+None of this reaches a machine that is fully off (not sleeping) through an
+anchor's time — nothing can run to fire it or to catch it up. The schedule
+picks back up on its own once the machine is on again; that day's missed
+window just does not open on time.
+
 ---
 
 ## What claudron reads, and what it never touches
