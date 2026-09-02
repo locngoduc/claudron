@@ -70,7 +70,9 @@ jobs:
           python -m venv /tmp/probe
           /tmp/probe/bin/pip install --quiet dist/*.whl
           /tmp/probe/bin/claudron --version
-          test "$(/tmp/probe/bin/pip list --format=freeze | wc -l)" -eq 1
+          # --exclude pip: pip lists itself, and it is part of the venv, not
+          # of claudron. What this asserts is that claudron pulled in nothing.
+          test "$(/tmp/probe/bin/pip list --format=freeze --exclude pip | wc -l)" -eq 1
 
       - name: Debian package
         run: |
