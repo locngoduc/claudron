@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # claudron has no runtime dependencies, but keep the dev/build toolchain
+  # (build, twine, mkdocs-material, etc.) and pip itself current.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Keep the Actions used by ci.yml, release.yml and pages.yml pinned to
+  # current, patched versions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
